@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PULSE — всё, что происходит сейчас</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+<style>
+:root{--bg:#f3f1ec;--card:#fff;--ink:#16161a;--mut:#6b6b76;--line:#dcd9d0;--acc:#e5322d;--new:#fff1d6}
+@media(prefers-color-scheme:dark){:root{--bg:#101014;--card:#18181e;--ink:#f1f1f4;--mut:#8d8d9a;--line:#2a2a33;--acc:#ff4d47;--new:#3a2d12}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 "Segoe UI",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 14px 0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+h1{margin:0;font:800 22px/1 Georgia,serif;letter-spacing:-.5px}
+.live{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}
+.on .dot{background:var(--acc);animation:p 1s infinite}
+@keyframes p{50%{opacity:.25}}
+nav{display:flex;gap:4px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
+nav button{flex:none;background:none;border:0;border-bottom:3px solid transparent;color:var(--mut);font:600 15px inherit;padding:10px 12px;cursor:pointer}
+nav button.a{color:var(--ink);border-color:var(--acc)}
+nav b{font-weight:600;font-size:12px;margin-left:5px;color:var(--acc)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:10px 14px 0;scrollbar-width:none}
+.chips button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 12px;font-size:13px;cursor:pointer}
+.chips button.a{background:var(--ink);color:var(--bg)}
+main{max-width:760px;margin:0 auto;padding:12px 14px 40px}
+.grid{display:grid;gap:10px}
+.memes .grid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+article{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+article.n{animation:f 4s ease-out}
+@keyframes f{from{background:var(--new)}}
+article img{display:block;width:100%;max-height:340px;object-fit:cover;background:var(--line)}
+.bd{padding:11px 13px}
+.meta{display:flex;gap:8px;font-size:12px;color:var(--mut);margin-bottom:5px;flex-wrap:wrap}
+.meta .s{color:var(--acc);font-weight:700}
+a.t{color:var(--ink);text-decoration:none;font-weight:600;overflow-wrap:anywhere}
+a.t:hover{text-decoration:underline}
+.ac{margin-top:9px;display:flex;gap:8px}
+.ac button{border:1px solid var(--line);background:none;color:var(--ink);border-radius:7px;padding:6px 10px;font-size:13px;cursor:pointer}
+.ac button.ok{background:var(--acc);border-color:var(--acc);color:#fff}
+.empty{text-align:center;color:var(--mut);padding:50px 0}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;transition:.2s;pointer-events:none}
+#toast.s{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><h1>PULSE</h1><div class="live" id="live"><span class="dot"></span><span id="st">подключение…</span></div></div>
+  <nav id="nav"></nav>
+</header>
+<div class="chips" id="chips"></div>
+<main><div class="grid" id="list"></div></main>
+<div id="toast"></div>
+<script>
+const TABS=[['news','Новости'],['memes','Мемы'],['trends','Тренды'],['people','Персоны']];
+const MAX=12*3600e3;
+let items=new Map(),posted=new Set(),tab='news',person='',fresh=new Set(),pend=0;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const age=t=>{const s=Math.max(0,(Date.now()-t)/1000|0);return s<60?s+' с':s<3600?(s/60|0)+' мин':(s/3600|0)+' ч '+((s%3600)/60|0)+' мин'};
+const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('s');setTimeout(()=>t.classList.remove('s'),2500)};
+function render(){
+  pend=0;
+  const all=[...items.values()].filter(i=>Date.now()-i.ts<MAX);
+  $('nav').innerHTML=TABS.map(([k,n])=>`<button data-t="${k}" class="${k==tab?'a':''}">${n}<b>${all.filter(i=>i.cat==k).length}</b></button>`).join('');
+  const ppl=[...new Set(all.filter(i=>i.cat=='people').map(i=>i.person))];
+  $('chips').innerHTML=tab=='people'?['',...ppl].map(p=>`<button data-p="${esc(p)}" class="${p==person?'a':''}">${p||'Все'}</button>`).join(''):'';
+  document.body.className=tab;
+  const list=all.filter(i=>i.cat==tab&&(!person||tab!='people'||i.person==person)).sort((a,b)=>b.ts-a.ts).slice(0,150);
+  $('list').innerHTML=list.length?list.map(i=>`<article class="${fresh.has(i.id)?'n':''}">${i.img?`<img loading="lazy" src="${esc(i.img)}" alt="" onerror="this.remove()">`:''}<div class="bd"><div class="meta"><span class="s">${esc(i.person?i.person+' · '+i.src:i.src)}</span><span data-ts="${i.ts}">${age(i.ts)}</span>${i.hot?`<span>▲ ${i.hot>999?(i.hot/1000).toFixed(1)+'k':i.hot}</span>`:''}</div><a class="t" href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.title)}</a><div class="ac"><button class="${posted.has(i.id)?'ok':''}" data-post="${i.id}">${posted.has(i.id)?'Отправлено в канал':'В Telegram-канал'}</button></div></div></article>`).join(''):'<div class="empty">Пока пусто — новые записи появятся сами</div>';
+  fresh.clear();
+}
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('[data-t]'),p=e.target.closest('[data-p]'),b=e.target.closest('[data-post]');
+  if(t){tab=t.dataset.t;person='';render();scrollTo(0,0)}
+  else if(p){person=p.dataset.p;render()}
+  else if(b&&!posted.has(b.dataset.post)){
+    const tk=localStorage.getItem('gh')||prompt('GitHub токен (Personal access token)');if(!tk)return;
+    const r=await fetch(`https://api.github.com/repos/${REPO}/dispatches`,{method:'POST',headers:{authorization:'Bearer '+tk,accept:'application/vnd.github+json'},body:JSON.stringify({event_type:'post',client_payload:{id:b.dataset.post}})});
+    if(r.status==204){localStorage.setItem('gh',tk);posted.add(b.dataset.post);localStorage.setItem('posted',JSON.stringify([...posted]));toast('Отправляю в канал…');render()}
+    else{if([401,403,404].includes(r.status))localStorage.removeItem('gh');toast('Ошибка '+r.status+': проверь токен')}
+  }
+});
+function setLive(v,txt){$('live').className='live'+(v?' on':'');$('st').textContent=txt}
+const Q=new URLSearchParams(location.search);
+const REPO=Q.get('repo')||(location.hostname.split('.')[0]+'/'+location.pathname.split('/')[1]);
+const RAW=`https://raw.githubusercontent.com/${REPO}/data/items.json`;
+let started=0;
+async function load(){
+  try{
+    const j=await(await fetch(RAW+'?t='+Date.now(),{cache:'no-store'})).json();
+    if(!started){started=1;posted=new Set(JSON.parse(localStorage.getItem('posted')||'[]'))}
+    (j.posted||[]).forEach(p=>posted.add(p));
+    const had=items.size,nw=new Map();let ch=0;
+    j.items.forEach(i=>{if(!items.has(i.id)){ch=1;if(had)fresh.add(i.id)}nw.set(i.id,i)});
+    if(nw.size!=items.size)ch=1;
+    items=nw;if(ch||!had)render();
+    setLive(1,'LIVE · данные '+age(j.updated)+' назад');
+  }catch{setLive(0,'жду первый запуск сборщика')}
+}
+load();setInterval(load,5000);
+setInterval(()=>document.querySelectorAll('[data-ts]').forEach(n=>n.textContent=age(+n.dataset.ts)),1000);
+setInterval(render,60000);
+init();
+</script>
+</body>
+</html>
